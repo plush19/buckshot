@@ -1,0 +1,1924 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Buckshot Roulette — Alpha 2.3</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: #000;
+    color: #ccc;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    user-select: none;
+    width: 100%;
+    height: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #canvas-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+  }
+  #canvas-container canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  #menu {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at center, #1a0505 0%, #000 70%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    transition: opacity 0.6s;
+  }
+  #menu.hidden { opacity: 0; pointer-events: none; }
+  .menu-title {
+    font-size: 30px;
+    letter-spacing: 8px;
+    color: #c41e1e;
+    text-shadow: 0 0 20px #c41e1e, 0 0 40px #8b0000;
+    text-align: center;
+    animation: pulse 3s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  .menu-sub {
+    font-size: 11px;
+    color: #666;
+    letter-spacing: 6px;
+    margin-top: 20px;
+    text-align: center;
+  }
+  .menu-btn {
+    background: rgba(10,10,10,0.9);
+    color: #ccc;
+    border: 2px solid #8b0000;
+    padding: 16px 55px;
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    letter-spacing: 6px;
+    cursor: pointer;
+    border-radius: 4px;
+    text-shadow: 0 0 8px #000;
+    transition: 0.3s;
+  }
+  .menu-btn:active {
+    background: rgba(80,10,10,0.95);
+    color: #fff;
+    border-color: #ff3333;
+    box-shadow: 0 0 20px #8b0000;
+  }
+  .menu-alpha {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    font-size: 10px;
+    color: #444;
+    letter-spacing: 3px;
+  }
+
+  #ui {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 14px;
+    padding-top: 50px;
+    padding-bottom: 20px;
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    text-shadow: 0 0 8px #000, 0 0 4px #000;
+    letter-spacing: 2px;
+  }
+  .hearts {
+    color: #c41e1e;
+    letter-spacing: 3px;
+    font-size: 18px;
+    text-shadow: 0 0 12px #c41e1e, 0 0 6px #000;
+  }
+  .status {
+    text-align: center;
+    font-size: 12px;
+    color: #aaa;
+    text-shadow: 0 0 8px #000;
+    letter-spacing: 3px;
+    margin-top: 8px;
+  }
+  .bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    pointer-events: auto;
+  }
+  .slots {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+  }
+  .slot {
+    width: 58px;
+    height: 42px;
+    background: rgba(8,8,8,0.7);
+    border: 1px solid #333;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: #444;
+    text-align: center;
+    padding: 2px;
+    line-height: 1.1;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .slot.filled {
+    border-color: #555;
+    background: rgba(15,15,15,0.9);
+    color: #ccc;
+    font-size: 10px;
+  }
+  .slot.filled:active { background: rgba(80,10,10,0.95); border-color: #c41e1e; }
+  .slot.disabled { opacity: 0.3; pointer-events: none; }
+  .slot.target {
+    border-color: #ffcc44;
+    box-shadow: 0 0 12px #ffcc44;
+    animation: slotPulse 0.8s infinite;
+  }
+  @keyframes slotPulse {
+    0%, 100% { box-shadow: 0 0 12px #ffcc44; }
+    50% { box-shadow: 0 0 20px #ffcc44, 0 0 30px #ffcc44; }
+  }
+  .actions { display: flex; gap: 10px; }
+  button {
+    background: rgba(8,8,8,0.9);
+    color: #ccc;
+    border: 1px solid #333;
+    padding: 14px 22px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    text-shadow: 0 0 4px #000;
+    letter-spacing: 2px;
+    transition: 0.15s;
+  }
+  button:active:not(:disabled) { background: rgba(80,10,10,0.95); border-color: #c41e1e; color: #fff; }
+  button:disabled { opacity: 0.3; pointer-events: none; }
+  .shell-info {
+    font-size: 11px;
+    color: #888;
+    text-shadow: 0 0 6px #000;
+    letter-spacing: 2px;
+    background: rgba(0,0,0,0.5);
+    padding: 4px 10px;
+    border-radius: 3px;
+  }
+  .log {
+    position: fixed;
+    top: 50px;
+    right: 14px;
+    width: 180px;
+    max-height: 130px;
+    overflow-y: auto;
+    font-size: 10px;
+    color: rgba(150,150,150,0.7);
+    text-align: right;
+    line-height: 1.6;
+    text-shadow: 0 0 6px #000;
+    z-index: 10;
+    pointer-events: none;
+    scrollbar-width: none;
+  }
+  .log::-webkit-scrollbar { display: none; }
+  .log .red { color: rgba(200,60,60,0.85); }
+  .log .green { color: rgba(80,160,80,0.85); }
+  .log .gold { color: rgba(220,180,60,0.9); }
+
+  #endScreen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9);
+    z-index: 60;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+  }
+  #endScreen.show { display: flex; }
+  .end-title {
+    font-size: 34px;
+    letter-spacing: 10px;
+    text-shadow: 0 0 30px currentColor;
+  }
+  .end-title.win { color: #4a8a4a; }
+  .end-title.lose { color: #c41e1e; }
+  .end-btn {
+    background: rgba(10,10,10,0.9);
+    color: #ccc;
+    border: 2px solid #555;
+    padding: 14px 40px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    letter-spacing: 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: 0.2s;
+  }
+  .end-btn:active { background: rgba(80,10,10,0.95); border-color: #c41e1e; color: #fff; }
+
+  #deathScreen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: #000;
+    z-index: 80;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    pointer-events: none;
+  }
+  #deathScreen.show { display: flex; }
+
+  .heart-emoji {
+    font-size: 100px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.3s;
+    filter: drop-shadow(0 0 30px #c41e1e);
+  }
+  .heart-emoji.show { opacity: 1; }
+
+  .death-text {
+    font-size: 22px;
+    color: #c41e1e;
+    letter-spacing: 8px;
+    text-shadow: 0 0 20px #c41e1e, 0 0 40px #8b0000;
+    text-align: center;
+    padding: 0 20px;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .death-text.show { opacity: 1; }
+
+  /* === ОВЕРЛЕЙ СУНДУКА === */
+  #chestOverlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 70;
+    display: none;
+    pointer-events: none;
+  }
+  #chestOverlay.show { display: block; }
+
+  #chestHint {
+    position: fixed;
+    top: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #ffcc44;
+    font-size: 12px;
+    letter-spacing: 4px;
+    text-shadow: 0 0 10px #ffcc44, 0 0 20px #8b0000;
+    background: rgba(0,0,0,0.7);
+    padding: 8px 16px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  #chestHint.show { opacity: 1; }
+
+  .alpha-tag {
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    font-size: 9px;
+    color: #333;
+    letter-spacing: 3px;
+    z-index: 30;
+    pointer-events: none;
+  }
+  .fps-tag {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    font-size: 9px;
+    color: #444;
+    letter-spacing: 2px;
+    z-index: 30;
+    pointer-events: none;
+  }
+
+  #error {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(80,0,0,0.95);
+    color: #fff;
+    padding: 20px;
+    font-size: 12px;
+    z-index: 200;
+    max-width: 90%;
+    border: 1px solid #f00;
+    display: none;
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+<div id="canvas-container"></div>
+
+<div id="menu">
+  <div>
+    <div class="menu-title">BUCKSHOT<br>ROULETTE</div>
+    <div class="menu-sub">ALPHA 2.3</div>
+  </div>
+  <button class="menu-btn" id="btnPlay">ИГРАТЬ</button>
+  <div class="menu-alpha">© ALPHA BUILD</div>
+</div>
+
+<div id="deathScreen">
+  <div class="heart-emoji" id="heartEmoji">❤️</div>
+  <div class="death-text" id="deathText">СИСТЕМА ВОЗВРАЩАЕТ ВАС</div>
+</div>
+
+<div id="endScreen">
+  <div class="end-title" id="endTitle">ТЫ ВЫИГРАЛ</div>
+  <button class="end-btn" id="btnEndMenu">В МЕНЮ</button>
+</div>
+
+<div id="chestOverlay">
+  <div id="chestHint">ВЫБЕРИ ПРЕДМЕТ ИЗ СУНДУКА</div>
+</div>
+
+<div id="ui">
+  <div class="top">
+    <div>ТЫ <span class="hearts" id="playerHearts">❤❤❤</span></div>
+    <div><span class="hearts" id="dealerHearts">❤❤❤</span> ДИЛЕР</div>
+  </div>
+  <div class="status" id="status">ТВОЙ ХОД</div>
+  <div class="bottom">
+    <div class="shell-info" id="shellInfo">ПАТРОНЫ НЕИЗВЕСТНЫ</div>
+    <div class="slots" id="slots"></div>
+    <div class="actions">
+      <button id="btnSelf">В СЕБЯ</button>
+      <button id="btnDealer">В ДИЛЕРА</button>
+    </div>
+  </div>
+</div>
+
+<div class="log" id="log"></div>
+<div class="alpha-tag">ALPHA 2.3</div>
+<div class="fps-tag" id="fpsTag">FPS: --</div>
+<div id="error"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+window.onerror = function(msg, url, line) {
+  const el = document.getElementById('error');
+  el.style.display = 'block';
+  el.textContent = 'ОШИБКА: ' + msg + '\n' + (url || '') + ':' + (line || '');
+};
+
+// ========== ЗВУК ==========
+let audioCtx = null;
+function initAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch(e) {}
+}
+function playShot() {
+  try {
+    initAudio();
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    const bufferSize = audioCtx.sampleRate * 0.3;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 3);
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2000, t);
+    filter.frequency.exponentialRampToValueAtTime(200, t + 0.3);
+    noise.connect(filter).connect(gain).connect(audioCtx.destination);
+    noise.start(t);
+  } catch(e) {}
+}
+function playClick() {
+  try {
+    initAudio();
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1200, t);
+    osc.frequency.exponentialRampToValueAtTime(200, t + 0.05);
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.1);
+  } catch(e) {}
+}
+function playGlitch() {
+  try {
+    initAudio();
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(80, t);
+    osc.frequency.linearRampToValueAtTime(400, t + 0.15);
+    osc.frequency.linearRampToValueAtTime(60, t + 0.4);
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.5);
+  } catch(e) {}
+}
+function playChest() {
+  try {
+    initAudio();
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    // Глухой "дзынь"
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, t);
+    osc.frequency.exponentialRampToValueAtTime(800, t + 0.1);
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.5);
+  } catch(e) {}
+}
+
+// ========== ЛОГИКА ==========
+const state = {
+  playerHP: 3, dealerHP: 3,
+  shells: [], current: 0,
+  turn: 'player',
+  playerItems: [], dealerItems: [],
+  handsCuffed: false, sawedOff: false,
+  gameOver: false,
+  knownShell: null, dealerKnowledge: null,
+  paused: false,
+  inMenu: true,
+  busy: false,
+  playerDead: false,
+  dealerDead: false,
+  // Для сундука
+  dealerItemsUsedThisRound: 0,
+  roundNumber: 0,
+};
+
+const ITEMS = {
+  beer: { name: '🍺', full: '🍺 БАНКА' },
+  saw: { name: '🔧', full: '🔧 НАПИЛЬНИК' },
+  glass: { name: '🔍', full: '🔍 ЛУПА' },
+  cuffs: { name: '⛓', full: '⛓ НАРУЧНИКИ' },
+};
+
+const MAX_ITEMS = 4;
+const $ = (id) => document.getElementById(id);
+
+function log(msg, cls = '') {
+  const el = document.createElement('div');
+  if (cls) el.className = cls;
+  el.textContent = msg;
+  $('log').appendChild(el);
+  $('log').scrollTop = $('log').scrollHeight;
+}
+
+function randomShells() {
+  const total = 2 + Math.floor(Math.random() * 5);
+  const live = 1 + Math.floor(Math.random() * (total - 1));
+  const blank = total - live;
+  const arr = [];
+  for (let i = 0; i < live; i++) arr.push('live');
+  for (let i = 0; i < blank; i++) arr.push('blank');
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function randomItem() {
+  const keys = Object.keys(ITEMS);
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
+function currentShell() { return state.shells[state.current]; }
+
+function startRound() {
+  state.roundNumber++;
+  state.shells = randomShells();
+  state.current = 0;
+  state.sawedOff = false;
+  state.knownShell = null;
+  state.handsCuffed = false;
+  state.dealerItemsUsedThisRound = 0;
+
+  state.paused = true;
+  update();
+
+  log('--- РАУНД ' + state.roundNumber + ' ---');
+  const liveCount = state.shells.filter(s => s === 'live').length;
+  const blankCount = state.shells.filter(s => s === 'blank').length;
+  log(`Боевых: ${liveCount} / Холостых: ${blankCount}`);
+
+  showShellBoard(() => {
+    state.paused = false;
+    update();
+    if (state.turn === 'player') $('status').textContent = 'ТВОЙ ХОД';
+    else setTimeout(dealerTurn, 1200);
+  });
+}
+
+// === КОНЕЦ РАУНДА: СУНДУК + ПОПОЛНЕНИЕ ДИЛЕРА ===
+function endRound() {
+  state.paused = true;
+  state.busy = true;
+  update();
+
+  // Сначала пополняем дилера
+  const used = state.dealerItemsUsedThisRound;
+  if (used > 0) {
+    for (let i = 0; i < used; i++) {
+      if (state.dealerItems.length < MAX_ITEMS) {
+        state.dealerItems.push(randomItem());
+      }
+    }
+    log(`Дилер пополнил ${used} предмет(ов)`, 'red');
+  } else {
+    log('Дилер не использовал предметов — инвентарь без изменений', '');
+  }
+
+  // Открываем сундук для игрока
+  setTimeout(() => {
+    openChest();
+  }, 800);
+}
+
+// === СУНДУК ===
+let chestItems = [];       // очередь предметов из сундука
+let chestCurrentItem = null;
+let chestItemTimer = null;
+let chestActive = false;
+let chestWaitingForSlot = false;
+let chestClosed = false;
+
+function openChest() {
+  // Проверка: все слоты заполнены
+  if (state.playerItems.length >= MAX_ITEMS) {
+    log('Сундук: все слоты заполнены', '');
+    // Показать сундук на 3 сек и закрыть
+    showChest3D(() => {
+      log('Сундук исчез (нет места)', '');
+      finishRound();
+    }, true);
+    return;
+  }
+
+  // Генерируем 3-4 предмета
+  const count = 3 + Math.floor(Math.random() * 2); // 3 или 4
+  chestItems = [];
+  for (let i = 0; i < count; i++) {
+    chestItems.push(randomItem());
+  }
+  log(`Сундук: ${count} предмет(ов)`, 'gold');
+  chestActive = true;
+  chestClosed = false;
+
+  showChest3D(() => {
+    // Сундук открыт — начинаем показывать предметы по одному
+    showNextChestItem();
+  });
+}
+
+function showNextChestItem() {
+  if (chestItems.length === 0) {
+    // Все предметы показаны
+    closeChest();
+    return;
+  }
+
+  // Если слоты заполнены — закрываем
+  if (state.playerItems.length >= MAX_ITEMS) {
+    closeChest();
+    return;
+  }
+
+  chestCurrentItem = chestItems.shift();
+  chestWaitingForSlot = true;
+
+  // Показать 3D-предмет над сундуком
+  showChestItem3D(chestCurrentItem);
+
+  // Подсветить слоты
+  update();
+
+  // Таймер 3 секунды
+  chestItemTimer = setTimeout(() => {
+    if (chestWaitingForSlot) {
+      // Не взял — пропускаем
+      chestWaitingForSlot = false;
+      hideChestItem3D();
+      log('Предмет пропущен', '');
+      setTimeout(showNextChestItem, 300);
+    }
+  }, 3000);
+}
+
+function pickChestItem() {
+  // Игрок нажал на предмет — теперь ждём выбор слота
+  if (!chestWaitingForSlot) return;
+  chestWaitingForSlot = false;
+  if (chestItemTimer) clearTimeout(chestItemTimer);
+  // Подсветить свободные слоты
+  update();
+}
+
+function placeChestItemInSlot(slotIndex) {
+  // Игрок выбрал слот
+  if (!chestCurrentItem) return;
+  if (slotIndex < 0 || slotIndex >= MAX_ITEMS) return;
+  if (state.playerItems[slotIndex]) return; // слот занят
+
+  // Кладём предмет
+  state.playerItems[slotIndex] = chestCurrentItem;
+  log(`Взят: ${ITEMS[chestCurrentItem].full}`, 'green');
+  chestCurrentItem = null;
+
+  hideChestItem3D();
+  update();
+
+  // Следующий предмет
+  setTimeout(showNextChestItem, 400);
+}
+
+function closeChest() {
+  chestActive = false;
+  chestCurrentItem = null;
+  if (chestItemTimer) clearTimeout(chestItemTimer);
+  hideChestItem3D();
+  hideChest3D();
+  setTimeout(finishRound, 600);
+}
+
+function finishRound() {
+  state.busy = false;
+  state.paused = false;
+  // Начинаем новый раунд
+  startRound();
+}
+
+// === СМЕРТЬ ИГРОКА ===
+function playerDeath(callback) {
+  state.playerDead = true;
+  state.busy = true;
+  playGlitch();
+
+  const screen = $('deathScreen');
+  const heart = $('heartEmoji');
+  const text = $('deathText');
+
+  heart.textContent = '❤️';
+  heart.classList.remove('show');
+  text.classList.remove('show');
+
+  screen.classList.add('show');
+
+  setTimeout(() => { heart.classList.add('show'); }, 1000);
+  setTimeout(() => { heart.textContent = '💔'; }, 2000);
+
+  setTimeout(() => {
+    screen.classList.remove('show');
+    heart.classList.remove('show');
+    state.playerDead = false;
+    state.busy = false;
+    callback();
+  }, 3000);
+}
+
+// === ДИЛЕР: отлёт + возврат ===
+function dealerVanish(callback) {
+  state.dealerDead = true;
+  state.busy = true;
+  playGlitch();
+
+  dealerKnockedBack = true;
+  dealerKnockbackProgress = 0;
+  dealerReturnFromBackProgress = 0;
+
+  setTimeout(() => {
+    dealerKnockedBack = false;
+    dealerHiddenInBack = true;
+    state.dealerDead = false;
+  }, 1000);
+
+  setTimeout(() => {
+    dealerHiddenInBack = false;
+    dealerReturnFromBackProgress = 0.01;
+  }, 1200);
+
+  setTimeout(() => {
+    dealerReturnFromBackProgress = 1;
+    dealerKnockbackProgress = 0;
+    state.busy = false;
+    callback();
+  }, 2400);
+}
+
+function shoot(target) {
+  if (state.gameOver || state.turn !== 'player' || state.paused || state.inMenu || state.busy) return;
+  if (chestActive) return;
+
+  if (target === 'self') {
+    state.busy = true;
+    update();
+    aimAtSelf(() => {
+      executeShot('self');
+    });
+  } else {
+    executeShot('dealer');
+  }
+}
+
+function executeShot(target) {
+  const shell = currentShell();
+  const isLive = shell === 'live';
+  const dmg = state.sawedOff ? 2 : 1;
+  state.sawedOff = false;
+  state.knownShell = null;
+
+  if (target === 'self') {
+    if (isLive) {
+      state.playerHP -= dmg;
+      log(`В себя — БОЕВОЙ! -${dmg}`, 'red');
+      playShot();
+      state.busy = true;
+      update();
+      playerDeath(() => {
+        finishPlayerShot(true);
+      });
+      return;
+    } else {
+      log('В себя — холостой. Ход остаётся.', 'green');
+      playClick();
+    }
+  } else {
+    if (isLive) {
+      state.dealerHP -= dmg;
+      log(`В дилера — БОЕВОЙ! -${dmg}`, 'red');
+      flashMuzzle();
+      recoil();
+      playShot();
+      state.busy = true;
+      update();
+      setTimeout(() => {
+        dealerVanish(() => {
+          finishPlayerShot(false);
+        });
+      }, 500);
+      return;
+    } else {
+      log('В дилера — холостой. Ход переходит.');
+      recoil();
+      playClick();
+    }
+  }
+
+  finishPlayerShot(target === 'self' && !isLive);
+}
+
+function finishPlayerShot(stayTurn) {
+  state.current++;
+  state.busy = false;
+  update();
+  if (checkRoundEnd()) return;
+  if (stayTurn) return;
+
+  state.turn = 'dealer';
+  update();
+  passGunToDealer();
+  const thinkTime = 1000 + Math.random() * 2000;
+  setTimeout(dealerTurn, thinkTime + 400);
+}
+
+let dealerThinking = false;
+
+function dealerTurn() {
+  if (state.gameOver || state.turn !== 'dealer' || state.paused || state.inMenu || state.busy) return;
+
+  if (state.handsCuffed) {
+    log('Дилер пропускает ход.', 'green');
+    state.handsCuffed = false;
+    state.turn = 'player';
+    passGunToPlayer();
+    update();
+    return;
+  }
+
+  dealerThinking = true;
+  update();
+
+  if (state.dealerItems.length > 0 && Math.random() < 0.5) {
+    const idx = Math.floor(Math.random() * state.dealerItems.length);
+    const item = state.dealerItems[idx];
+    if (item === 'glass') {
+      state.dealerKnowledge = currentShell();
+      log('Дилер смотрит в лупу.');
+      state.dealerItems.splice(idx, 1);
+      state.dealerItemsUsedThisRound++;
+    } else if (item === 'saw' && Math.random() < 0.5) {
+      state.sawedOff = true;
+      log('Дилер точит дробовик.', 'red');
+      state.dealerItems.splice(idx, 1);
+      state.dealerItemsUsedThisRound++;
+    } else if (item === 'beer' && state.dealerHP < 3) {
+      state.dealerHP = Math.min(state.dealerHP + 1, 5);
+      log('Дилер выпил банку. +1 HP', 'green');
+      state.dealerItems.splice(idx, 1);
+      state.dealerItemsUsedThisRound++;
+    } else if (item === 'cuffs' && Math.random() < 0.3) {
+      state.handsCuffed = true;
+      log('Дилер надел на тебя наручники!', 'red');
+      state.dealerItems.splice(idx, 1);
+      state.dealerItemsUsedThisRound++;
+    }
+  }
+
+  const extraThink = 500 + Math.random() * 1000;
+
+  setTimeout(() => {
+    if (state.gameOver) return;
+    dealerThinking = false;
+    dealerShotWindup = true;
+    update();
+    setTimeout(() => {
+      dealerShotWindup = false;
+      executeDealerShot();
+    }, 500);
+  }, extraThink);
+}
+
+function executeDealerShot() {
+  if (state.gameOver) return;
+  const shell = currentShell();
+  let target;
+  if (state.dealerKnowledge) target = (state.dealerKnowledge === 'blank') ? 'self' : 'player';
+  else target = Math.random() < 0.6 ? 'player' : 'self';
+
+  const isLive = shell === 'live';
+  const dmg = state.sawedOff ? 2 : 1;
+  state.sawedOff = false;
+  state.dealerKnowledge = null;
+
+  const doShot = () => {
+    if (target === 'self') {
+      if (isLive) {
+        state.dealerHP -= dmg;
+        log(`Дилер в себя — БОЕВОЙ! -${dmg}`, 'red');
+        dealerRecoil();
+        playShot();
+        state.busy = true;
+        update();
+        setTimeout(() => {
+          dealerVanish(() => {
+            finishDealerShot(true);
+          });
+        }, 500);
+        return;
+      } else {
+        log('Дилер в себя — холостой. Ход остаётся.', 'green');
+        dealerRecoil();
+        playClick();
+      }
+    } else {
+      if (isLive) {
+        state.playerHP -= dmg;
+        log(`Дилер в тебя — БОЕВОЙ! -${dmg}`, 'red');
+        dealerFlash();
+        playShot();
+        state.busy = true;
+        update();
+        playerDeath(() => {
+          finishDealerShot(false);
+        });
+        return;
+      } else {
+        log('Дилер в тебя — холостой. Ход переходит.');
+        dealerFlash();
+        playClick();
+      }
+    }
+
+    finishDealerShot(target === 'self' && !isLive);
+  };
+
+  if (target === 'self') {
+    dealerAimSelf(doShot);
+  } else {
+    doShot();
+  }
+}
+
+function finishDealerShot(stayTurn) {
+  state.current++;
+  state.busy = false;
+  update();
+  if (checkRoundEnd()) return;
+
+  if (stayTurn) {
+    setTimeout(dealerTurn, 1200);
+    return;
+  }
+
+  state.turn = 'player';
+  passGunToPlayer();
+  update();
+}
+
+function checkRoundEnd() {
+  if (state.playerHP <= 0) {
+    state.gameOver = true;
+    log('ТЫ ПРОИГРАЛ.', 'red');
+    showEnd(false);
+    return true;
+  }
+  if (state.dealerHP <= 0) {
+    state.gameOver = true;
+    log('ТЫ ВЫИГРАЛ.', 'green');
+    showEnd(true);
+    return true;
+  }
+  if (state.current >= state.shells.length) {
+    log('Патроны кончились.');
+    // Запускаем сундук и пополнение дилера
+    endRound();
+    return true;
+  }
+  return false;
+}
+
+function showEnd(win) {
+  $('endTitle').textContent = win ? 'ТЫ ВЫИГРАЛ' : 'ТЫ ПРОИГРАЛ';
+  $('endTitle').className = 'end-title ' + (win ? 'win' : 'lose');
+  $('endScreen').classList.add('show');
+}
+
+function useItem(index) {
+  if (state.turn !== 'player' || state.gameOver || state.paused || state.inMenu || state.busy) return;
+  if (chestActive) return;
+  const item = state.playerItems[index];
+  if (!item) return;
+  switch (item) {
+    case 'beer': state.playerHP = Math.min(state.playerHP + 1, 5); log('Ты выпил банку. +1 HP', 'green'); break;
+    case 'saw': state.sawedOff = true; log('Ты точишь дробовик. Урон x2', 'red'); break;
+    case 'glass': state.knownShell = currentShell(); log(`Лупа: ${state.knownShell === 'live' ? 'БОЕВОЙ' : 'холостой'}`, 'red'); break;
+    case 'cuffs': state.handsCuffed = true; log('Ты надел наручники на дилера.', 'red'); break;
+  }
+  state.playerItems.splice(index, 1);
+  update();
+}
+
+function update() {
+  $('playerHearts').textContent = '❤'.repeat(Math.max(0, state.playerHP));
+  $('dealerHearts').textContent = '❤'.repeat(Math.max(0, state.dealerHP));
+  if (state.knownShell && state.turn === 'player') {
+    $('shellInfo').textContent = `СЛЕДУЮЩИЙ: ${state.knownShell === 'live' ? 'БОЕВОЙ' : 'ХОЛОСТОЙ'}`;
+  } else {
+    $('shellInfo').textContent = `ОСТАЛОСЬ: ${state.shells.length - state.current}`;
+  }
+
+  const slotsEl = $('slots');
+  slotsEl.innerHTML = '';
+  for (let i = 0; i < MAX_ITEMS; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    const item = state.playerItems[i];
+    if (item) {
+      slot.classList.add('filled');
+      slot.textContent = ITEMS[item].name;
+      if (state.turn !== 'player' || state.gameOver || state.paused || state.inMenu || state.busy) {
+        slot.classList.add('disabled');
+      }
+      slot.onclick = () => useItem(i);
+    } else {
+      slot.textContent = '—';
+      // Если сундук активен и ждёт выбора слота — подсветить пустой слот
+      if (chestActive && chestCurrentItem && !chestWaitingForSlot && !chestClosed) {
+        slot.classList.add('target');
+        slot.onclick = () => placeChestItemInSlot(i);
+      }
+    }
+    slotsEl.appendChild(slot);
+  }
+
+  const canAct = state.turn === 'player' && !state.gameOver && !state.paused && !state.inMenu && !state.busy && !chestActive;
+  $('btnSelf').disabled = !canAct;
+  $('btnDealer').disabled = !canAct;
+
+  if (state.inMenu || state.paused) return;
+  if (state.gameOver) return;
+  if (chestActive) {
+    $('status').textContent = 'СУНДУК';
+    return;
+  }
+  if (state.turn === 'player') $('status').textContent = 'ТВОЙ ХОД';
+  else if (dealerThinking) $('status').textContent = 'ДИЛЕР ДУМАЕТ...';
+  else $('status').textContent = 'ХОД ДИЛЕРА';
+}
+
+// ========== 3D ПЕРЕМЕННЫЕ ==========
+let scene, camera, renderer;
+let playerGun, dealerGun, muzzleFlashP, muzzleFlashD, dealerGroup, lampLight;
+let dealerHead, dealerEyeL, dealerEyeR;
+let shakeTime = 0, recoilTimeP = 0, recoilTimeD = 0;
+let gunPassProgress = 0;
+let gunPassTarget = 0;
+let eyeBlinkTimer = 0;
+let eyeVisible = true;
+
+let dealerKnockbackProgress = 0;
+let dealerReturnFromBackProgress = 0;
+let dealerKnockedBack = false;
+let dealerHiddenInBack = false;
+let dealerShotWindup = false;
+
+let shellBoardGroup = null;
+let shellBoardVisible = false;
+let shellBoardTimer = 0;
+let shellBoardCallback = null;
+
+// Сундук
+let chestGroup = null;
+let chestLid = null;
+let chestItemMesh = null;
+let chestVisible = false;
+let chestOpenProgress = 0;
+let chestTargetOpen = 0;
+let chestDisappearing = false;
+let chestDisappearTimer = 0;
+let chestGlowLight = null;
+
+let frameCount = 0;
+let lastFpsUpdate = 0;
+let currentFps = 0;
+
+let aimTarget = 0;
+let aimProgress = 0;
+
+let lastFrameTime = 0;
+const FPS_LIMIT = 45;
+const FRAME_MIN = 1000 / FPS_LIMIT;
+
+// ========== 3D ФУНКЦИИ ==========
+function createShotgun() {
+  const g = new THREE.Group();
+  const barrelMat = new THREE.MeshStandardMaterial({
+    color: 0x1a1a1e, metalness: 0.95, roughness: 0.2
+  });
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 1.3, 8), barrelMat);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.z = -0.45;
+  g.add(barrel);
+
+  const barrel2 = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 1.3, 8), barrelMat);
+  barrel2.rotation.x = Math.PI / 2;
+  barrel2.position.set(0, 0.09, -0.45);
+  g.add(barrel2);
+
+  const stockMat = new THREE.MeshStandardMaterial({ color: 0x3a2210, roughness: 0.8 });
+  const stock = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.55), stockMat);
+  stock.position.set(0, -0.06, 0.3);
+  g.add(stock);
+
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.25, 0.12), stockMat);
+  grip.position.set(0, -0.2, 0.15);
+  grip.rotation.x = 0.2;
+  g.add(grip);
+
+  const receiver = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.12, 0.25),
+    new THREE.MeshStandardMaterial({ color: 0x0e0e10, metalness: 0.9, roughness: 0.3 })
+  );
+  receiver.position.set(0, 0.02, 0.05);
+  g.add(receiver);
+
+  const flash = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 6, 6),
+    new THREE.MeshBasicMaterial({
+      color: 0xffcc44, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending
+    })
+  );
+  flash.position.z = -1.1;
+  g.add(flash);
+  g.userData.flash = flash;
+
+  return g;
+}
+
+// === Табло с патронами (ИСПРАВЛЕНО) ===
+function createShellBoard() {
+  shellBoardGroup = new THREE.Group();
+
+  // Панель — тонкая доска
+  const panelMat = new THREE.MeshStandardMaterial({ 
+    color: 0x3a2515, roughness: 0.8, metalness: 0.1
+  });
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.04, 0.35), panelMat);
+  shellBoardGroup.add(panel);
+
+  shellBoardGroup.visible = false;
+  scene.add(shellBoardGroup);
+  shellBoardGroup.userData.tokens = [];
+}
+
+function buildShellTokens(shells) {
+  // Удаляем старые
+  if (shellBoardGroup.userData.tokens) {
+    shellBoardGroup.userData.tokens.forEach(t => {
+      shellBoardGroup.remove(t);
+      if (t.geometry) t.geometry.dispose();
+      if (t.material) t.material.dispose();
+    });
+  }
+  shellBoardGroup.userData.tokens = [];
+
+  const liveCount = shells.filter(s => s === 'live').length;
+  const blankCount = shells.filter(s => s === 'blank').length;
+  const total = liveCount + blankCount;
+
+  const tokens = [];
+  for (let i = 0; i < liveCount; i++) tokens.push('live');
+  for (let i = 0; i < blankCount; i++) tokens.push('blank');
+
+  const spacingX = 0.22;
+  const startX = -((total - 1) / 2) * spacingX;
+
+  tokens.forEach((type, i) => {
+    const x = startX + i * spacingX;
+
+    const isLive = type === 'live';
+    const shellMat = new THREE.MeshStandardMaterial({
+      color: isLive ? 0xcc1111 : 0x2255cc,
+      emissive: isLive ? 0x881111 : 0x113388,
+      emissiveIntensity: 0.8,
+      metalness: 0.7,
+      roughness: 0.3
+    });
+    const shellMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.16, 8),
+      shellMat
+    );
+    shellMesh.rotation.z = Math.PI / 2;
+    shellMesh.position.set(x, 0.05, 0);
+    // Начинаем с полного размера, чтобы сразу было видно
+    shellMesh.scale.set(1, 1, 1);
+    shellMesh.userData.delay = i * 0.1;
+    shellBoardGroup.add(shellMesh);
+    shellBoardGroup.userData.tokens.push(shellMesh);
+  });
+}
+
+function showShellBoard(callback) {
+  if (!shellBoardGroup) {
+    setTimeout(callback, 100);
+    return;
+  }
+  buildShellTokens(state.shells);
+  shellBoardGroup.visible = true;
+  shellBoardVisible = true;
+  shellBoardTimer = 0;
+  shellBoardCallback = callback;
+
+  shellBoardGroup.position.set(0, 0.99, -0.8);
+  shellBoardGroup.rotation.set(-Math.PI / 2, 0, 0);
+
+  setTimeout(() => {
+    shellBoardVisible = false;
+  }, 3000);
+}
+
+// === СУНДУК (3D) ===
+function createChest() {
+  chestGroup = new THREE.Group();
+
+  // Основание сундука
+  const baseMat = new THREE.MeshStandardMaterial({ 
+    color: 0x4a2a15, roughness: 0.8, metalness: 0.1
+  });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 0.5), baseMat);
+  base.position.y = 0.15;
+  chestGroup.add(base);
+
+  // Металлические полосы
+  const metalMat = new THREE.MeshStandardMaterial({ 
+    color: 0x2a2a2e, metalness: 0.9, roughness: 0.3
+  });
+  const strip1 = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.32, 0.05), metalMat);
+  strip1.position.set(0, 0.15, 0.15);
+  chestGroup.add(strip1);
+  const strip2 = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.32, 0.05), metalMat);
+  strip2.position.set(0, 0.15, -0.15);
+  chestGroup.add(strip2);
+
+  // Крышка (вращается вокруг заднего края)
+  chestLid = new THREE.Group();
+  const lidMat = new THREE.MeshStandardMaterial({ 
+    color: 0x5a3520, roughness: 0.8, metalness: 0.1
+  });
+  const lidTop = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 0.5), lidMat);
+  lidTop.position.y = 0.05;
+  chestLid.add(lidTop);
+
+  const lidStrip1 = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.12, 0.05), metalMat);
+  lidStrip1.position.set(0, 0.05, 0.15);
+  chestLid.add(lidStrip1);
+  const lidStrip2 = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.12, 0.05), metalMat);
+  lidStrip2.position.set(0, 0.05, -0.15);
+  chestLid.add(lidStrip2);
+
+  // Петля — крепим крышку к заднему краю
+  chestLid.position.set(0, 0.3, -0.25);
+  chestGroup.add(chestLid);
+
+  // Свет изнутри
+  chestGlowLight = new THREE.PointLight(0xffaa44, 0, 1.5, 2);
+  chestGlowLight.position.set(0, 0.3, 0);
+  chestGroup.add(chestGlowLight);
+
+  chestGroup.visible = false;
+  chestGroup.position.set(0, 0.99, -1.2);
+  scene.add(chestGroup);
+}
+
+function showChest3D(callback, noItems) {
+  if (!chestGroup) {
+    setTimeout(callback, 100);
+    return;
+  }
+  chestGroup.visible = true;
+  chestVisible = true;
+  chestOpenProgress = 0;
+  chestTargetOpen = 1;
+  chestDisappearing = false;
+  chestDisappearTimer = 0;
+  chestClosed = false;
+
+  playChest();
+
+  // Через 0.8 сек — крышка открыта, показываем предметы (или закрываем если noItems)
+  setTimeout(() => {
+    if (noItems) {
+      // Сундук без предметов — ждём 3 сек и исчезает
+      setTimeout(() => {
+        chestTargetOpen = 0;
+        chestDisappearing = true;
+      }, 3000);
+    } else {
+      callback();
+    }
+  }, 800);
+}
+
+function hideChest3D() {
+  chestDisappearing = true;
+  chestTargetOpen = 0;
+}
+
+// === 3D-предмет над сундуком ===
+function createItemMesh(itemType) {
+  const g = new THREE.Group();
+  const goldMat = new THREE.MeshStandardMaterial({
+    color: 0xffcc44,
+    emissive: 0xaa7700,
+    emissiveIntensity: 0.8,
+    metalness: 0.9,
+    roughness: 0.3
+  });
+
+  // Простая 3D-иконка в зависимости от типа
+  if (itemType === 'beer') {
+    // Банка
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.2, 8), goldMat);
+    g.add(can);
+  } else if (itemType === 'saw') {
+    // Напильник — длинный брусок
+    const file = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.28), goldMat);
+    g.add(file);
+  } else if (itemType === 'glass') {
+    // Лупа — сфера + ручка
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), goldMat);
+    g.add(lens);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 6), goldMat);
+    handle.position.set(0.12, -0.08, 0);
+    handle.rotation.z = Math.PI / 4;
+    g.add(handle);
+  } else if (itemType === 'cuffs') {
+    // Наручники — два кольца
+    const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.02, 6, 12), goldMat);
+    g.add(ring1);
+    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.02, 6, 12), goldMat);
+    ring2.position.set(0.15, 0, 0);
+    g.add(ring2);
+  }
+
+  return g;
+}
+
+function showChestItem3D(itemType) {
+  if (chestItemMesh) {
+    chestGroup.remove(chestItemMesh);
+    chestItemMesh = null;
+  }
+  chestItemMesh = createItemMesh(itemType);
+  chestItemMesh.position.set(0, 0.45, 0);
+  chestItemMesh.userData.spawnTime = 0;
+  chestItemMesh.userData.baseY = 0.45;
+  chestGroup.add(chestItemMesh);
+}
+
+function hideChestItem3D() {
+  if (chestItemMesh) {
+    chestGroup.remove(chestItemMesh);
+    chestItemMesh = null;
+  }
+}
+
+function init3D() {
+  try {
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0a0505, 0.055);
+    scene.background = new THREE.Color(0x0a0505);
+
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 1.6, 0);
+    camera.rotation.x = -0.18;
+
+    renderer = new THREE.WebGLRenderer({ 
+      antialias: false,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(1.0);
+    renderer.shadowMap.enabled = false;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    $('canvas-container').appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0x3a2020, 0.85));
+
+    lampLight = new THREE.PointLight(0xffaa66, 3.5, 14, 2);
+    lampLight.position.set(0, 3.5, -2);
+    scene.add(lampLight);
+
+    const table = new THREE.Mesh(
+      new THREE.BoxGeometry(4.5, 0.15, 6),
+      new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.85 })
+    );
+    table.position.set(0, 0.9, -2);
+    scene.add(table);
+
+    const line = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.2, 0.06),
+      new THREE.MeshBasicMaterial({ color: 0x6a0a0a })
+    );
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(0, 0.986, -1);
+    scene.add(line);
+
+    for (let i = 0; i < 2; i++) {
+      const stain = new THREE.Mesh(
+        new THREE.CircleGeometry(0.15, 6),
+        new THREE.MeshBasicMaterial({ color: 0x1a0303, transparent: true, opacity: 0.5 })
+      );
+      stain.rotation.x = -Math.PI / 2;
+      stain.position.set((Math.random() - 0.5) * 3, 0.987, -2 + (Math.random() - 0.5) * 3);
+      scene.add(stain);
+    }
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.MeshStandardMaterial({ color: 0x100808, roughness: 1 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    const wall = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 12),
+      new THREE.MeshStandardMaterial({ color: 0x160a0a, roughness: 1 })
+    );
+    wall.position.set(0, 6, -10);
+    scene.add(wall);
+
+    const lampGroup = new THREE.Group();
+    const cord = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.01, 0.01, 2, 4),
+      new THREE.MeshBasicMaterial({ color: 0x111111 })
+    );
+    cord.position.y = 1;
+    lampGroup.add(cord);
+
+    const shade = new THREE.Mesh(
+      new THREE.ConeGeometry(0.4, 0.4, 8, 1, true),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide })
+    );
+    shade.rotation.x = Math.PI;
+    lampGroup.add(shade);
+
+    const bulb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 6, 6),
+      new THREE.MeshBasicMaterial({ color: 0xffcc66 })
+    );
+    bulb.position.y = -0.15;
+    lampGroup.add(bulb);
+    lampGroup.position.set(0, 4, -2);
+    scene.add(lampGroup);
+
+    for (let i = 0; i < 2; i++) {
+      const points = [];
+      const startX = (Math.random() - 0.5) * 6;
+      for (let j = 0; j < 5; j++) {
+        points.push(new THREE.Vector3(
+          startX + Math.sin(j * 0.8 + i) * 0.5,
+          5 - j * 0.6,
+          -8 + Math.random() * 0.5
+        ));
+      }
+      const curve = new THREE.CatmullRomCurve3(points);
+      const tube = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 12, 0.02, 4, false),
+        new THREE.MeshBasicMaterial({ color: 0x1a0a0a })
+      );
+      scene.add(tube);
+    }
+
+    const bottle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.1, 0.5, 6),
+      new THREE.MeshStandardMaterial({
+        color: 0x1a3a1a, roughness: 0.3,
+        transparent: true, opacity: 0.85
+      })
+    );
+    bottle.position.set(-1.3, 1.15, -2);
+    scene.add(bottle);
+
+    dealerGroup = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x151010, roughness: 1 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.7, 1.6, 8), bodyMat);
+    body.position.y = 0.8;
+    dealerGroup.add(body);
+
+    const headMat = new THREE.MeshStandardMaterial({ color: 0x1a1414, roughness: 1 });
+    dealerHead = new THREE.Mesh(new THREE.SphereGeometry(0.38, 10, 10), headMat);
+    dealerHead.position.y = 1.8;
+    dealerGroup.add(dealerHead);
+
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff1111 });
+    dealerEyeL = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), eyeMat);
+    dealerEyeL.position.set(-0.13, 1.85, 0.32);
+    dealerGroup.add(dealerEyeL);
+    dealerEyeR = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), eyeMat);
+    dealerEyeR.position.set(0.13, 1.85, 0.32);
+    dealerGroup.add(dealerEyeR);
+
+    const hatMat = new THREE.MeshStandardMaterial({ color: 0x0a0808, roughness: 0.9 });
+    const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 10), hatMat);
+    hat.position.y = 2.15;
+    dealerGroup.add(hat);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.05, 10), hatMat);
+    brim.position.y = 2.0;
+    dealerGroup.add(brim);
+
+    dealerGroup.position.set(0, 1, -5);
+    scene.add(dealerGroup);
+
+    playerGun = createShotgun();
+    muzzleFlashP = playerGun.userData.flash;
+    playerGun.position.set(0.38, -0.38, -0.55);
+    playerGun.rotation.set(0.12, 0.18, 0);
+    camera.add(playerGun);
+    scene.add(camera);
+
+    dealerGun = createShotgun();
+    muzzleFlashD = dealerGun.userData.flash;
+    dealerGun.position.set(0.35, 1.15, -4.0);
+    dealerGun.rotation.set(-0.15, Math.PI, 0.05);
+    dealerGun.visible = false;
+    scene.add(dealerGun);
+
+    createShellBoard();
+    createChest();
+
+    window.addEventListener('resize', onResize);
+    animate();
+    log('Alpha 2.3 загружена');
+  } catch(e) {
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('error').textContent = 'Ошибка 3D: ' + e.message;
+  }
+}
+
+function onResize() {
+  if (!camera || !renderer) return;
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function flashMuzzle() {
+  if (!muzzleFlashP) return;
+  muzzleFlashP.material.opacity = 1;
+  setTimeout(() => { if (muzzleFlashP) muzzleFlashP.material.opacity = 0; }, 90);
+}
+function dealerFlash() {
+  if (!muzzleFlashD) return;
+  muzzleFlashD.material.opacity = 1;
+  setTimeout(() => { if (muzzleFlashD) muzzleFlashD.material.opacity = 0; }, 90);
+}
+function shakeCamera(duration) { shakeTime = duration; }
+function recoil() { recoilTimeP = 0.15; }
+function dealerRecoil() { recoilTimeD = 0.2; }
+
+function dealerAimSelf(callback) {
+  dealerGun.userData.aimSelf = 1;
+  setTimeout(() => {
+    callback();
+    setTimeout(() => { dealerGun.userData.aimSelf = 0; }, 400);
+  }, 500);
+}
+
+function passGunToDealer() { gunPassTarget = 1; }
+function passGunToPlayer() { gunPassTarget = 0; }
+
+function aimAtSelf(callback) {
+  aimTarget = 1;
+  setTimeout(() => {
+    callback();
+    setTimeout(() => { aimTarget = 0; }, 400);
+  }, 500);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const now = performance.now();
+  const elapsed = now - lastFrameTime;
+  if (elapsed < FRAME_MIN) return;
+  lastFrameTime = now - (elapsed % FRAME_MIN);
+
+  const t = now * 0.001;
+  const dt = 0.016;
+
+  frameCount++;
+  if (now - lastFpsUpdate > 500) {
+    currentFps = Math.round(frameCount * 1000 / (now - lastFpsUpdate));
+    frameCount = 0;
+    lastFpsUpdate = now;
+    $('fpsTag').textContent = 'FPS: ' + currentFps;
+  }
+
+  gunPassProgress += (gunPassTarget - gunPassProgress) * 0.08;
+  aimProgress += (aimTarget - aimProgress) * 0.15;
+
+  if (camera) {
+    camera.position.y = 1.6 + Math.sin(t * 1.5) * 0.012;
+    camera.rotation.z = Math.sin(t * 0.8) * 0.006;
+  }
+
+  if (shakeTime > 0) {
+    shakeTime -= dt;
+    if (camera) {
+      camera.position.x = (Math.random() - 0.5) * 0.08;
+      camera.position.y += (Math.random() - 0.5) * 0.05;
+      camera.rotation.z += (Math.random() - 0.5) * 0.03;
+    }
+  } else if (camera) {
+    camera.position.x = 0;
+  }
+
+  if (playerGun) {
+    const baseY = -0.38;
+    const baseZ = -0.55;
+    const baseRotX = 0.12;
+
+    const offsetY = -gunPassProgress * 1.2;
+
+    const aimRotY = -aimProgress * 2.2;
+    const aimRotZ = aimProgress * 0.3;
+    const aimPosX = 0.38 - aimProgress * 0.35;
+    const aimPosZ = -0.55 + aimProgress * 0.35;
+
+    if (recoilTimeP > 0) {
+      recoilTimeP -= dt;
+      playerGun.position.z = baseZ + aimProgress * 0.35 + recoilTimeP * 1.5;
+      playerGun.rotation.x = baseRotX + recoilTimeP * 0.8;
+    } else {
+      playerGun.position.z = aimPosZ;
+      playerGun.rotation.x = baseRotX + aimProgress * 0.15;
+    }
+    playerGun.position.y = baseY + offsetY + Math.sin(t * 2) * 0.006 * (1 - gunPassProgress);
+    playerGun.position.x = aimPosX;
+    playerGun.rotation.y = 0.18 + aimRotY;
+    playerGun.rotation.z = aimRotZ + Math.sin(t * 1.2) * 0.012;
+    playerGun.visible = gunPassProgress < 0.95 && !state.playerDead;
+  }
+
+  if (dealerGun) {
+    const showProgress = Math.max(0, (gunPassProgress - 0.3) / 0.7);
+    const dealerVisible = !dealerKnockedBack && !dealerHiddenInBack && !state.dealerDead;
+    dealerGun.visible = showProgress > 0.05 && dealerVisible;
+
+    const baseY = 1.15;
+    const baseZ = -4.0;
+    const baseRotX = -0.15;
+
+    const appearY = baseY - (1 - showProgress) * 0.8;
+    const appearRotX = baseRotX + (1 - showProgress) * 0.5;
+
+    const windupRotX = dealerShotWindup ? -0.3 : 0;
+
+    const aimSelf = dealerGun.userData.aimSelf || 0;
+    dealerGun.userData.aimSelfProgress = (dealerGun.userData.aimSelfProgress || 0);
+    dealerGun.userData.aimSelfProgress += (aimSelf - dealerGun.userData.aimSelfProgress) * 0.15;
+    const asp = dealerGun.userData.aimSelfProgress;
+
+    if (recoilTimeD > 0) {
+      recoilTimeD -= dt;
+      dealerGun.position.z = baseZ + recoilTimeD * 1.5 - asp * 0.5;
+      dealerGun.rotation.x = appearRotX - recoilTimeD * 0.8 + asp * 0.6 + windupRotX;
+    } else {
+      dealerGun.position.z = baseZ - asp * 0.5;
+      dealerGun.rotation.x = appearRotX + asp * 0.6 + windupRotX;
+    }
+    dealerGun.position.y = appearY + Math.sin(t * 2 + 1) * 0.008 * showProgress - asp * 0.4;
+    dealerGun.position.x = 0.35 + Math.sin(t * 1.5) * 0.005 * showProgress - asp * 0.35;
+    dealerGun.rotation.y = Math.PI + asp * 1.5;
+    dealerGun.rotation.z = Math.sin(t * 1.2) * 0.015 * showProgress + asp * 0.3;
+  }
+
+  if (lampLight) {
+    const flicker = 0.92 + Math.sin(t * 8) * 0.04 + Math.random() * 0.04;
+    lampLight.intensity = 3.5 * flicker;
+  }
+
+  // Дилер
+  if (dealerGroup) {
+    const basePosY = 1;
+    const basePosZ = -5;
+
+    if (dealerKnockedBack) {
+      dealerKnockbackProgress = Math.min(1, dealerKnockbackProgress + 0.045);
+      const p = dealerKnockbackProgress;
+      dealerGroup.position.z = basePosZ - p * 3;
+      dealerGroup.position.y = basePosY + p * 1.5;
+      dealerGroup.position.x = 0;
+      dealerGroup.rotation.x = -p * 0.8;
+      dealerGroup.rotation.z = p * 0.3;
+      dealerGroup.traverse(c => {
+        if (c.material && c.material.opacity !== undefined) {
+          c.material.transparent = true;
+          c.material.opacity = Math.max(0, 1 - p * 1.2);
+        }
+      });
+    } else if (dealerHiddenInBack) {
+      dealerGroup.position.z = basePosZ - 6;
+      dealerGroup.position.y = basePosY;
+      dealerGroup.position.x = 0;
+      dealerGroup.rotation.x = 0;
+      dealerGroup.rotation.z = 0;
+      dealerGroup.traverse(c => {
+        if (c.material && c.material.opacity !== undefined) {
+          c.material.transparent = true;
+          c.material.opacity = 0;
+        }
+      });
+    } else if (dealerReturnFromBackProgress > 0 && dealerReturnFromBackProgress < 1) {
+      dealerReturnFromBackProgress = Math.min(1, dealerReturnFromBackProgress + 0.025);
+      const p = dealerReturnFromBackProgress;
+      dealerGroup.position.z = (basePosZ - 6) + p * 6;
+      dealerGroup.position.y = basePosY;
+      dealerGroup.position.x = 0;
+      dealerGroup.rotation.x = 0;
+      dealerGroup.rotation.z = Math.sin(t * 8) * 0.05 * (1 - p);
+      dealerGroup.traverse(c => {
+        if (c.material && c.material.opacity !== undefined) {
+          c.material.transparent = true;
+          c.material.opacity = p;
+        }
+      });
+    } else {
+      dealerGroup.position.z = basePosZ;
+      dealerGroup.position.x = 0;
+      dealerGroup.rotation.x = 0;
+      dealerGroup.rotation.z = 0;
+      dealerGroup.traverse(c => {
+        if (c.material && c.material.opacity !== undefined) {
+          c.material.transparent = true;
+          c.material.opacity = 1;
+        }
+      });
+
+      dealerGroup.position.y = basePosY + Math.sin(t * 1.2) * 0.02;
+      const baseRotY = Math.sin(t * 0.5) * 0.05;
+
+      if (dealerThinking) {
+        dealerGroup.rotation.x = 0.08 + Math.sin(t * 3) * 0.08;
+      } else {
+        dealerGroup.rotation.x *= 0.9;
+      }
+
+      dealerGroup.rotation.y = baseRotY;
+    }
+  }
+
+  if (dealerHead && !state.dealerDead && !dealerKnockedBack && !dealerHiddenInBack) {
+    if (dealerThinking) {
+      dealerHead.rotation.z = Math.sin(t * 2.5) * 0.15;
+      dealerHead.rotation.x = Math.sin(t * 1.8) * 0.1 + 0.1;
+    } else {
+      dealerHead.rotation.z *= 0.95;
+      dealerHead.rotation.x *= 0.95;
+    }
+  }
+
+  eyeBlinkTimer -= dt;
+  if (eyeBlinkTimer <= 0 && !state.dealerDead && !dealerKnockedBack && !dealerHiddenInBack) {
+    eyeVisible = !eyeVisible;
+    if (dealerEyeL) dealerEyeL.visible = eyeVisible;
+    if (dealerEyeR) dealerEyeR.visible = eyeVisible;
+    eyeBlinkTimer = eyeVisible ? (2 + Math.random() * 3) : 0.1;
+  }
+
+  // Табло
+  if (shellBoardGroup && shellBoardGroup.userData.tokens) {
+    if (shellBoardVisible) {
+      shellBoardTimer += dt;
+    } else {
+      shellBoardGroup.visible = false;
+      if (shellBoardCallback) {
+        const cb = shellBoardCallback;
+        shellBoardCallback = null;
+        cb();
+      }
+    }
+  }
+
+  // === СУНДУК ===
+  if (chestGroup) {
+    if (chestVisible) {
+      // Плавное открытие/закрытие
+      chestOpenProgress += (chestTargetOpen - chestOpenProgress) * 0.1;
+      if (chestLid) {
+        chestLid.rotation.x = -chestOpenProgress * 1.4; // открывается вверх
+      }
+      if (chestGlowLight) {
+        chestGlowLight.intensity = chestOpenProgress * 1.5;
+      }
+
+      // Покачивание предмета над сундуком
+      if (chestItemMesh) {
+        chestItemMesh.userData.spawnTime += dt;
+        const bob = Math.sin(t * 3) * 0.03;
+        const rise = Math.min(0.15, chestItemMesh.userData.spawnTime * 0.3);
+        chestItemMesh.position.y = chestItemMesh.userData.baseY + bob + rise;
+        chestItemMesh.rotation.y = t * 1.5;
+      }
+
+      // Исчезновение
+      if (chestDisappearing) {
+        chestDisappearTimer += dt;
+        chestGroup.position.y = 0.99 - chestDisappearTimer * 0.5;
+        chestGroup.traverse(c => {
+          if (c.material && c.material.opacity !== undefined) {
+            c.material.transparent = true;
+            c.material.opacity = Math.max(0, 1 - chestDisappearTimer * 1.5);
+          }
+        });
+        if (chestDisappearTimer > 0.7) {
+          chestVisible = false;
+          chestGroup.visible = false;
+          chestGroup.position.y = 0.99;
+          chestGroup.traverse(c => {
+            if (c.material && c.material.opacity !== undefined) {
+              c.material.opacity = 1;
+            }
+          });
+        }
+      }
+    }
+  }
+
+  if (renderer && scene && camera) renderer.render(scene, camera);
+}
+
+// ========== МЕНЮ ==========
+function startGame() {
+  initAudio();
+  state.inMenu = false;
+  $('menu').classList.add('hidden');
+  $('endScreen').classList.remove('show');
+  state.playerHP = 3;
+  state.dealerHP = 3;
+  state.gameOver = false;
+  state.turn = 'player';
+  state.sawedOff = false;
+  state.handsCuffed = false;
+  state.knownShell = null;
+  state.dealerKnowledge = null;
+  state.busy = false;
+  state.playerDead = false;
+  state.dealerDead = false;
+  state.playerItems = [];
+  state.dealerItems = [];
+  state.roundNumber = 0;
+  state.dealerItemsUsedThisRound = 0;
+  gunPassProgress = 0;
+  gunPassTarget = 0;
+  aimProgress = 0;
+  aimTarget = 0;
+  dealerKnockbackProgress = 0;
+  dealerReturnFromBackProgress = 0;
+  dealerKnockedBack = false;
+  dealerHiddenInBack = false;
+  chestActive = false;
+  chestItems = [];
+  chestCurrentItem = null;
+  if (dealerGroup) {
+    dealerGroup.scale.set(1, 1, 1);
+    dealerGroup.position.set(0, 1, -5);
+    dealerGroup.rotation.set(0, 0, 0);
+    dealerGroup.traverse(c => {
+      if (c.material && c.material.opacity !== undefined) {
+        c.material.opacity = 1;
+      }
+    });
+  }
+  $('log').innerHTML = '';
+  startRound();
+}
+
+function toMenu() {
+  state.inMenu = true;
+  state.gameOver = true;
+  $('menu').classList.remove('hidden');
+  $('endScreen').classList.remove('show');
+  if (shellBoardGroup) shellBoardGroup.visible = false;
+  if (chestGroup) chestGroup.visible = false;
+  chestActive = false;
+}
+
+$('btnPlay').onclick = startGame;
+$('btnEndMenu').onclick = toMenu;
+$('btnSelf').onclick = () => { initAudio(); shoot('self'); };
+$('btnDealer').onclick = () => { initAudio(); shoot('dealer'); };
+
+init3D();
+</script>
+</body>
+</html>
