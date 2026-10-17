@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Buckshot Roulette — Alpha 2.3</title>
+<title>Buckshot Roulette — Alpha 2.4</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -285,7 +285,6 @@
   }
   .death-text.show { opacity: 1; }
 
-  /* === ОВЕРЛЕЙ СУНДУКА === */
   #chestOverlay {
     position: fixed;
     top: 0; left: 0;
@@ -313,6 +312,22 @@
     pointer-events: none;
   }
   #chestHint.show { opacity: 1; }
+
+  #loading {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: #000;
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #c41e1e;
+    font-size: 14px;
+    letter-spacing: 6px;
+    text-shadow: 0 0 20px #c41e1e;
+  }
+  #loading.hidden { display: none; }
 
   .alpha-tag {
     position: fixed;
@@ -354,10 +369,12 @@
 <body>
 <div id="canvas-container"></div>
 
+<div id="loading">ЗАГРУЗКА...</div>
+
 <div id="menu">
   <div>
     <div class="menu-title">BUCKSHOT<br>ROULETTE</div>
-    <div class="menu-sub">ALPHA 2.3</div>
+    <div class="menu-sub">ALPHA 2.4</div>
   </div>
   <button class="menu-btn" id="btnPlay">ИГРАТЬ</button>
   <div class="menu-alpha">© ALPHA BUILD</div>
@@ -394,11 +411,12 @@
 </div>
 
 <div class="log" id="log"></div>
-<div class="alpha-tag">ALPHA 2.3</div>
+<div class="alpha-tag">ALPHA 2.4</div>
 <div class="fps-tag" id="fpsTag">FPS: --</div>
 <div id="error"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 window.onerror = function(msg, url, line) {
   const el = document.getElementById('error');
@@ -478,7 +496,6 @@ function playChest() {
     initAudio();
     if (!audioCtx) return;
     const t = audioCtx.currentTime;
-    // Глухой "дзынь"
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = 'sine';
@@ -506,7 +523,6 @@ const state = {
   busy: false,
   playerDead: false,
   dealerDead: false,
-  // Для сундука
   dealerItemsUsedThisRound: 0,
   roundNumber: 0,
 };
@@ -575,13 +591,11 @@ function startRound() {
   });
 }
 
-// === КОНЕЦ РАУНДА: СУНДУК + ПОПОЛНЕНИЕ ДИЛЕРА ===
 function endRound() {
   state.paused = true;
   state.busy = true;
   update();
 
-  // Сначала пополняем дилера
   const used = state.dealerItemsUsedThisRound;
   if (used > 0) {
     for (let i = 0; i < used; i++) {
@@ -594,14 +608,13 @@ function endRound() {
     log('Дилер не использовал предметов — инвентарь без изменений', '');
   }
 
-  // Открываем сундук для игрока
   setTimeout(() => {
     openChest();
   }, 800);
 }
 
 // === СУНДУК ===
-let chestItems = [];       // очередь предметов из сундука
+let chestItems = [];
 let chestCurrentItem = null;
 let chestItemTimer = null;
 let chestActive = false;
@@ -609,10 +622,8 @@ let chestWaitingForSlot = false;
 let chestClosed = false;
 
 function openChest() {
-  // Проверка: все слоты заполнены
   if (state.playerItems.length >= MAX_ITEMS) {
     log('Сундук: все слоты заполнены', '');
-    // Показать сундук на 3 сек и закрыть
     showChest3D(() => {
       log('Сундук исчез (нет места)', '');
       finishRound();
@@ -620,8 +631,7 @@ function openChest() {
     return;
   }
 
-  // Генерируем 3-4 предмета
-  const count = 3 + Math.floor(Math.random() * 2); // 3 или 4
+  const count = 3 + Math.floor(Math.random() * 2);
   chestItems = [];
   for (let i = 0; i < count; i++) {
     chestItems.push(randomItem());
@@ -631,19 +641,15 @@ function openChest() {
   chestClosed = false;
 
   showChest3D(() => {
-    // Сундук открыт — начинаем показывать предметы по одному
     showNextChestItem();
   });
 }
 
 function showNextChestItem() {
   if (chestItems.length === 0) {
-    // Все предметы показаны
     closeChest();
     return;
   }
-
-  // Если слоты заполнены — закрываем
   if (state.playerItems.length >= MAX_ITEMS) {
     closeChest();
     return;
@@ -652,18 +658,17 @@ function showNextChestItem() {
   chestCurrentItem = chestItems.shift();
   chestWaitingForSlot = true;
 
-  // Показать 3D-предмет над сундуком
   showChestItem3D(chestCurrentItem);
-
-  // Подсветить слоты
+  $('chestHint').textContent = 'ТАПНИ ПРЕДМЕТ: ' + ITEMS[chestCurrentItem].full;
+  $('chestHint').classList.add('show');
   update();
 
-  // Таймер 3 секунды
   chestItemTimer = setTimeout(() => {
     if (chestWaitingForSlot) {
-      // Не взял — пропускаем
       chestWaitingForSlot = false;
+      chestCurrentItem = null;
       hideChestItem3D();
+      $('chestHint').classList.remove('show');
       log('Предмет пропущен', '');
       setTimeout(showNextChestItem, 300);
     }
@@ -671,29 +676,26 @@ function showNextChestItem() {
 }
 
 function pickChestItem() {
-  // Игрок нажал на предмет — теперь ждём выбор слота
   if (!chestWaitingForSlot) return;
   chestWaitingForSlot = false;
   if (chestItemTimer) clearTimeout(chestItemTimer);
-  // Подсветить свободные слоты
+  $('chestHint').textContent = 'ВЫБЕРИ СЛОТ';
   update();
 }
 
 function placeChestItemInSlot(slotIndex) {
-  // Игрок выбрал слот
   if (!chestCurrentItem) return;
   if (slotIndex < 0 || slotIndex >= MAX_ITEMS) return;
-  if (state.playerItems[slotIndex]) return; // слот занят
+  if (state.playerItems[slotIndex]) return;
 
-  // Кладём предмет
   state.playerItems[slotIndex] = chestCurrentItem;
   log(`Взят: ${ITEMS[chestCurrentItem].full}`, 'green');
   chestCurrentItem = null;
 
   hideChestItem3D();
+  $('chestHint').classList.remove('show');
   update();
 
-  // Следующий предмет
   setTimeout(showNextChestItem, 400);
 }
 
@@ -703,13 +705,13 @@ function closeChest() {
   if (chestItemTimer) clearTimeout(chestItemTimer);
   hideChestItem3D();
   hideChest3D();
+  $('chestHint').classList.remove('show');
   setTimeout(finishRound, 600);
 }
 
 function finishRound() {
   state.busy = false;
   state.paused = false;
-  // Начинаем новый раунд
   startRound();
 }
 
@@ -741,7 +743,7 @@ function playerDeath(callback) {
   }, 3000);
 }
 
-// === ДИЛЕР: отлёт + возврат ===
+// === ДИЛЕР ===
 function dealerVanish(callback) {
   state.dealerDead = true;
   state.busy = true;
@@ -799,9 +801,7 @@ function executeShot(target) {
       playShot();
       state.busy = true;
       update();
-      playerDeath(() => {
-        finishPlayerShot(true);
-      });
+      playerDeath(() => { finishPlayerShot(true); });
       return;
     } else {
       log('В себя — холостой. Ход остаётся.', 'green');
@@ -817,9 +817,7 @@ function executeShot(target) {
       state.busy = true;
       update();
       setTimeout(() => {
-        dealerVanish(() => {
-          finishPlayerShot(false);
-        });
+        dealerVanish(() => { finishPlayerShot(false); });
       }, 500);
       return;
     } else {
@@ -925,9 +923,7 @@ function executeDealerShot() {
         state.busy = true;
         update();
         setTimeout(() => {
-          dealerVanish(() => {
-            finishDealerShot(true);
-          });
+          dealerVanish(() => { finishDealerShot(true); });
         }, 500);
         return;
       } else {
@@ -943,9 +939,7 @@ function executeDealerShot() {
         playShot();
         state.busy = true;
         update();
-        playerDeath(() => {
-          finishDealerShot(false);
-        });
+        playerDeath(() => { finishDealerShot(false); });
         return;
       } else {
         log('Дилер в тебя — холостой. Ход переходит.');
@@ -995,7 +989,6 @@ function checkRoundEnd() {
   }
   if (state.current >= state.shells.length) {
     log('Патроны кончились.');
-    // Запускаем сундук и пополнение дилера
     endRound();
     return true;
   }
@@ -1047,7 +1040,6 @@ function update() {
       slot.onclick = () => useItem(i);
     } else {
       slot.textContent = '—';
-      // Если сундук активен и ждёт выбора слота — подсветить пустой слот
       if (chestActive && chestCurrentItem && !chestWaitingForSlot && !chestClosed) {
         slot.classList.add('target');
         slot.onclick = () => placeChestItemInSlot(i);
@@ -1092,7 +1084,6 @@ let shellBoardVisible = false;
 let shellBoardTimer = 0;
 let shellBoardCallback = null;
 
-// Сундук
 let chestGroup = null;
 let chestLid = null;
 let chestItemMesh = null;
@@ -1114,8 +1105,78 @@ let lastFrameTime = 0;
 const FPS_LIMIT = 45;
 const FRAME_MIN = 1000 / FPS_LIMIT;
 
-// ========== 3D ФУНКЦИИ ==========
-function createShotgun() {
+// Модель дробовика
+let shotgunModelPlayer = null;
+let shotgunModelDealer = null;
+let shotgunLoaded = false;
+const SHOTGUN_URL = 'https://plush19.github.io/buckshot/shotgun.glb';
+
+// ========== ЗАГРУЗКА МОДЕЛИ ==========
+function loadShotgunModel(callback) {
+  const loader = new THREE.GLTFLoader();
+  loader.load(
+    SHOTGUN_URL,
+    (gltf) => {
+      log('Модель дробовика загружена', 'green');
+
+      // === МОДЕЛЬ ДЛЯ ИГРОКА ===
+      shotgunModelPlayer = gltf.scene.clone();
+      // Масштаб — подгоняем
+      shotgunModelPlayer.scale.set(0.4, 0.4, 0.4);
+      // Позиция — в правом нижнем углу, как цилиндр
+      shotgunModelPlayer.position.set(0.38, -0.38, -0.55);
+      // Поворот — ствол смотрит вперёд от игрока
+      shotgunModelPlayer.rotation.set(0.12, 0.18, 0);
+
+      // Пробуем найти ствол и окрашиваем в тёмное
+      shotgunModelPlayer.traverse(c => {
+        if (c.isMesh) {
+          c.castShadow = false;
+          c.receiveShadow = false;
+        }
+      });
+
+      // === МОДЕЛЬ ДЛЯ ДИЛЕРА ===
+      shotgunModelDealer = gltf.scene.clone();
+      shotgunModelDealer.scale.set(0.4, 0.4, 0.4);
+      shotgunModelDealer.position.set(0.35, 1.15, -4.0);
+      // Поворот на 180° — ствол смотрит на игрока
+      shotgunModelDealer.rotation.set(-0.15, Math.PI, 0.05);
+      shotgunModelDealer.visible = false;
+
+      shotgunModelDealer.traverse(c => {
+        if (c.isMesh) {
+          c.castShadow = false;
+          c.receiveShadow = false;
+        }
+      });
+
+      shotgunLoaded = true;
+      if (callback) callback();
+
+      // Скрываем загрузочный экран
+      $('loading').classList.add('hidden');
+    },
+    (progress) => {
+      // Прогресс загрузки
+      if (progress.total > 0) {
+        const pct = Math.round(progress.loaded / progress.total * 100);
+        $('loading').textContent = 'ЗАГРУЗКА ' + pct + '%';
+      }
+    },
+    (error) => {
+      log('ОШИБКА загрузки модели: ' + error.message, 'red');
+      $('loading').textContent = 'ОШИБКА МОДЕЛИ';
+      // Всё равно продолжаем — используем fallback (цилиндры)
+      shotgunLoaded = false;
+      $('loading').classList.add('hidden');
+      if (callback) callback();
+    }
+  );
+}
+
+// ========== FALLBACK: цилиндр-дробовик ==========
+function createFallbackShotgun() {
   const g = new THREE.Group();
   const barrelMat = new THREE.MeshStandardMaterial({
     color: 0x1a1a1e, metalness: 0.95, roughness: 0.2
@@ -1161,11 +1222,10 @@ function createShotgun() {
   return g;
 }
 
-// === Табло с патронами (ИСПРАВЛЕНО) ===
+// === Табло ===
 function createShellBoard() {
   shellBoardGroup = new THREE.Group();
 
-  // Панель — тонкая доска
   const panelMat = new THREE.MeshStandardMaterial({ 
     color: 0x3a2515, roughness: 0.8, metalness: 0.1
   });
@@ -1178,7 +1238,6 @@ function createShellBoard() {
 }
 
 function buildShellTokens(shells) {
-  // Удаляем старые
   if (shellBoardGroup.userData.tokens) {
     shellBoardGroup.userData.tokens.forEach(t => {
       shellBoardGroup.remove(t);
@@ -1201,7 +1260,6 @@ function buildShellTokens(shells) {
 
   tokens.forEach((type, i) => {
     const x = startX + i * spacingX;
-
     const isLive = type === 'live';
     const shellMat = new THREE.MeshStandardMaterial({
       color: isLive ? 0xcc1111 : 0x2255cc,
@@ -1216,49 +1274,34 @@ function buildShellTokens(shells) {
     );
     shellMesh.rotation.z = Math.PI / 2;
     shellMesh.position.set(x, 0.05, 0);
-    // Начинаем с полного размера, чтобы сразу было видно
     shellMesh.scale.set(1, 1, 1);
-    shellMesh.userData.delay = i * 0.1;
     shellBoardGroup.add(shellMesh);
     shellBoardGroup.userData.tokens.push(shellMesh);
   });
 }
 
 function showShellBoard(callback) {
-  if (!shellBoardGroup) {
-    setTimeout(callback, 100);
-    return;
-  }
+  if (!shellBoardGroup) { setTimeout(callback, 100); return; }
   buildShellTokens(state.shells);
   shellBoardGroup.visible = true;
   shellBoardVisible = true;
   shellBoardTimer = 0;
   shellBoardCallback = callback;
-
   shellBoardGroup.position.set(0, 0.99, -0.8);
   shellBoardGroup.rotation.set(-Math.PI / 2, 0, 0);
-
-  setTimeout(() => {
-    shellBoardVisible = false;
-  }, 3000);
+  setTimeout(() => { shellBoardVisible = false; }, 3000);
 }
 
-// === СУНДУК (3D) ===
+// === Сундук ===
 function createChest() {
   chestGroup = new THREE.Group();
 
-  // Основание сундука
-  const baseMat = new THREE.MeshStandardMaterial({ 
-    color: 0x4a2a15, roughness: 0.8, metalness: 0.1
-  });
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x4a2a15, roughness: 0.8, metalness: 0.1 });
   const base = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 0.5), baseMat);
   base.position.y = 0.15;
   chestGroup.add(base);
 
-  // Металлические полосы
-  const metalMat = new THREE.MeshStandardMaterial({ 
-    color: 0x2a2a2e, metalness: 0.9, roughness: 0.3
-  });
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, metalness: 0.9, roughness: 0.3 });
   const strip1 = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.32, 0.05), metalMat);
   strip1.position.set(0, 0.15, 0.15);
   chestGroup.add(strip1);
@@ -1266,11 +1309,8 @@ function createChest() {
   strip2.position.set(0, 0.15, -0.15);
   chestGroup.add(strip2);
 
-  // Крышка (вращается вокруг заднего края)
   chestLid = new THREE.Group();
-  const lidMat = new THREE.MeshStandardMaterial({ 
-    color: 0x5a3520, roughness: 0.8, metalness: 0.1
-  });
+  const lidMat = new THREE.MeshStandardMaterial({ color: 0x5a3520, roughness: 0.8, metalness: 0.1 });
   const lidTop = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 0.5), lidMat);
   lidTop.position.y = 0.05;
   chestLid.add(lidTop);
@@ -1282,11 +1322,9 @@ function createChest() {
   lidStrip2.position.set(0, 0.05, -0.15);
   chestLid.add(lidStrip2);
 
-  // Петля — крепим крышку к заднему краю
   chestLid.position.set(0, 0.3, -0.25);
   chestGroup.add(chestLid);
 
-  // Свет изнутри
   chestGlowLight = new THREE.PointLight(0xffaa44, 0, 1.5, 2);
   chestGlowLight.position.set(0, 0.3, 0);
   chestGroup.add(chestGlowLight);
@@ -1297,10 +1335,7 @@ function createChest() {
 }
 
 function showChest3D(callback, noItems) {
-  if (!chestGroup) {
-    setTimeout(callback, 100);
-    return;
-  }
+  if (!chestGroup) { setTimeout(callback, 100); return; }
   chestGroup.visible = true;
   chestVisible = true;
   chestOpenProgress = 0;
@@ -1308,13 +1343,10 @@ function showChest3D(callback, noItems) {
   chestDisappearing = false;
   chestDisappearTimer = 0;
   chestClosed = false;
-
   playChest();
 
-  // Через 0.8 сек — крышка открыта, показываем предметы (или закрываем если noItems)
   setTimeout(() => {
     if (noItems) {
-      // Сундук без предметов — ждём 3 сек и исчезает
       setTimeout(() => {
         chestTargetOpen = 0;
         chestDisappearing = true;
@@ -1330,7 +1362,6 @@ function hideChest3D() {
   chestTargetOpen = 0;
 }
 
-// === 3D-предмет над сундуком ===
 function createItemMesh(itemType) {
   const g = new THREE.Group();
   const goldMat = new THREE.MeshStandardMaterial({
@@ -1341,17 +1372,13 @@ function createItemMesh(itemType) {
     roughness: 0.3
   });
 
-  // Простая 3D-иконка в зависимости от типа
   if (itemType === 'beer') {
-    // Банка
     const can = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.2, 8), goldMat);
     g.add(can);
   } else if (itemType === 'saw') {
-    // Напильник — длинный брусок
     const file = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.28), goldMat);
     g.add(file);
   } else if (itemType === 'glass') {
-    // Лупа — сфера + ручка
     const lens = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), goldMat);
     g.add(lens);
     const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 6), goldMat);
@@ -1359,7 +1386,6 @@ function createItemMesh(itemType) {
     handle.rotation.z = Math.PI / 4;
     g.add(handle);
   } else if (itemType === 'cuffs') {
-    // Наручники — два кольца
     const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.02, 6, 12), goldMat);
     g.add(ring1);
     const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.02, 6, 12), goldMat);
@@ -1538,14 +1564,15 @@ function init3D() {
     dealerGroup.position.set(0, 1, -5);
     scene.add(dealerGroup);
 
-    playerGun = createShotgun();
+    // === ДРОБОВИКИ: пока fallback-цилиндры, заменим после загрузки модели ===
+    playerGun = createFallbackShotgun();
     muzzleFlashP = playerGun.userData.flash;
     playerGun.position.set(0.38, -0.38, -0.55);
     playerGun.rotation.set(0.12, 0.18, 0);
     camera.add(playerGun);
     scene.add(camera);
 
-    dealerGun = createShotgun();
+    dealerGun = createFallbackShotgun();
     muzzleFlashD = dealerGun.userData.flash;
     dealerGun.position.set(0.35, 1.15, -4.0);
     dealerGun.rotation.set(-0.15, Math.PI, 0.05);
@@ -1555,12 +1582,55 @@ function init3D() {
     createShellBoard();
     createChest();
 
+    // === ЗАГРУЗКА МОДЕЛИ ДРОБОВИКА ===
+    loadShotgunModel(() => {
+      // После загрузки модели — заменяем цилиндры на модель
+      if (shotgunLoaded && shotgunModelPlayer && shotgunModelDealer) {
+        // Удаляем старый цилиндр игрока
+        camera.remove(playerGun);
+        // Заменяем ссылки — теперь playerGun это модель
+        playerGun = shotgunModelPlayer;
+        camera.add(playerGun);
+
+        // Удаляем старый цилиндр дилера
+        scene.remove(dealerGun);
+        dealerGun = shotgunModelDealer;
+        scene.add(dealerGun);
+
+        // Восстанавливаем ссылки на muzzle flash (создаём новые)
+        const flashP = new THREE.Mesh(
+          new THREE.SphereGeometry(0.22, 6, 6),
+          new THREE.MeshBasicMaterial({
+            color: 0xffcc44, transparent: true, opacity: 0,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        flashP.position.set(0, 0.05, -0.7);
+        playerGun.add(flashP);
+        muzzleFlashP = flashP;
+
+        const flashD = new THREE.Mesh(
+          new THREE.SphereGeometry(0.22, 6, 6),
+          new THREE.MeshBasicMaterial({
+            color: 0xffcc44, transparent: true, opacity: 0,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        flashD.position.set(0, 0.05, -0.7);
+        dealerGun.add(flashD);
+        muzzleFlashD = flashD;
+
+        log('Модель установлена', 'green');
+      }
+    });
+
     window.addEventListener('resize', onResize);
     animate();
-    log('Alpha 2.3 загружена');
+    log('Alpha 2.4 загружена');
   } catch(e) {
     document.getElementById('error').style.display = 'block';
     document.getElementById('error').textContent = 'Ошибка 3D: ' + e.message;
+    $('loading').classList.add('hidden');
   }
 }
 
@@ -1642,6 +1712,7 @@ function animate() {
     camera.position.x = 0;
   }
 
+  // === ДРОБОВИК ИГРОКА (независимо от того, модель или цилиндр) ===
   if (playerGun) {
     const baseY = -0.38;
     const baseZ = -0.55;
@@ -1669,6 +1740,7 @@ function animate() {
     playerGun.visible = gunPassProgress < 0.95 && !state.playerDead;
   }
 
+  // === ДРОБОВИК ДИЛЕРА ===
   if (dealerGun) {
     const showProgress = Math.max(0, (gunPassProgress - 0.3) / 0.7);
     const dealerVisible = !dealerKnockedBack && !dealerHiddenInBack && !state.dealerDead;
@@ -1809,19 +1881,17 @@ function animate() {
     }
   }
 
-  // === СУНДУК ===
+  // Сундук
   if (chestGroup) {
     if (chestVisible) {
-      // Плавное открытие/закрытие
       chestOpenProgress += (chestTargetOpen - chestOpenProgress) * 0.1;
       if (chestLid) {
-        chestLid.rotation.x = -chestOpenProgress * 1.4; // открывается вверх
+        chestLid.rotation.x = -chestOpenProgress * 1.4;
       }
       if (chestGlowLight) {
         chestGlowLight.intensity = chestOpenProgress * 1.5;
       }
 
-      // Покачивание предмета над сундуком
       if (chestItemMesh) {
         chestItemMesh.userData.spawnTime += dt;
         const bob = Math.sin(t * 3) * 0.03;
@@ -1830,7 +1900,6 @@ function animate() {
         chestItemMesh.rotation.y = t * 1.5;
       }
 
-      // Исчезновение
       if (chestDisappearing) {
         chestDisappearTimer += dt;
         chestGroup.position.y = 0.99 - chestDisappearTimer * 0.5;
@@ -1921,4 +1990,4 @@ $('btnDealer').onclick = () => { initAudio(); shoot('dealer'); };
 init3D();
 </script>
 </body>
-</html>
+ </html>
